@@ -1,6 +1,5 @@
 (function () {
   const KEY = "gp-map-vortex";
-  const REACH = 80000;
   const PLACES = {
     ra: {
       name: "Ready Athletics",
@@ -40,6 +39,59 @@
     return { lat: lat2 * 180 / Math.PI, lon: lon2 * 180 / Math.PI };
   }
 
+  function toCart(lat, lon) {
+    const p = lat * Math.PI / 180;
+    const l = lon * Math.PI / 180;
+    const c = Math.cos(p);
+    return [c * Math.cos(l), c * Math.sin(l), Math.sin(p)];
+  }
+
+  function fromCart(v) {
+    const r = Math.hypot(v[0], v[1], v[2]) || 1;
+    let lat = Math.asin(Math.max(-1, Math.min(1, v[2] / r))) * 180 / Math.PI;
+    const lon = Math.atan2(v[1], v[0]) * 180 / Math.PI;
+    if (lat > 85) lat = 85;
+    if (lat < -85) lat = -85;
+    return { lat: lat, lon: lon };
+  }
+
+  function scale(v, s) { return [v[0] * s, v[1] * s, v[2] * s]; }
+  function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+  function norm(v) {
+    const r = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / r, v[1] / r, v[2] / r];
+  }
+
+  function tangentAt(lat, lon, headingDeg) {
+    const p = lat * Math.PI / 180;
+    const l = lon * Math.PI / 180;
+    const east = [-Math.sin(l), Math.cos(l), 0];
+    const north = [-Math.sin(p) * Math.cos(l), -Math.sin(p) * Math.sin(l), Math.cos(p)];
+    const h = headingDeg * Math.PI / 180;
+    return norm(add(scale(north, Math.cos(h)), scale(east, Math.sin(h))));
+  }
+
+  function geodesic(lat, lon, headingDeg, maxRad, steps) {
+    const p = toCart(lat, lon);
+    const t = tangentAt(lat, lon, headingDeg);
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const th = maxRad * (i / steps);
+      pts.push(fromCart(add(scale(p, Math.cos(th)), scale(t, Math.sin(th)))));
+    }
+    return pts;
+  }
+
+  function splitDateLine(pts) {
+    const parts = [[]];
+    for (let i = 0; i < pts.length; i++) {
+      const cur = [pts[i].lat, pts[i].lon];
+      if (i && Math.abs(pts[i].lon - pts[i - 1].lon) > 180) parts.push([]);
+      parts[parts.length - 1].push(cur);
+    }
+    return parts.filter(function (part) { return part.length > 1; });
+  }
+
   function loadVortex() {
     try {
       const raw = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -58,11 +110,14 @@
   const map = L.map("map", {
     zoomControl: true,
     attributionControl: true,
-    preferCanvas: false
+    preferCanvas: false,
+    worldCopyJump: true,
+    minZoom: 2
   }).setView([start.lat, start.lon], 16);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
+    noWrap: false,
     attribution: "&copy; OpenStreetMap"
   }).addTo(map);
 
@@ -115,18 +170,16 @@
     for (let i = 0; i < 12; i++) {
       const a = i * 30;
       const b = (i + 1) * 30;
-      const p1 = destPoint(lon, lat, a, REACH);
-      const p2 = destPoint(lon, lat, b, REACH);
-      L.polygon(
-        [[lat, lon], [p1.lat, p1.lon], [p2.lat, p2.lon]],
-        {
-          color: "#c4a35a",
-          weight: 1.2,
-          fillColor: i % 2 === 0 ? "#c4a35a" : "#8a3a32",
-          fillOpacity: 0.16,
-          interactive: false
-        }
-      ).addTo(overlay);
+      const edge1 = geodesic(lat, lon, a, 0.055, 12);
+      const edge2 = geodesic(lat, lon, b, 0.055, 12).slice().reverse();
+      const local = [[lat, lon]].concat(edge1.map(function (p) { return [p.lat, p.lon]; })).concat(edge2.map(function (p) { return [p.lat, p.lon]; }));
+      L.polygon(local, {
+        color: "#c4a35a",
+        weight: 0,
+        fillColor: i % 2 === 0 ? "#c4a35a" : "#8a3a32",
+        fillOpacity: 0.16,
+        interactive: false
+      }).addTo(overlay);
       const mid = destPoint(lon, lat, a + 15, 90);
       L.marker([mid.lat, mid.lon], {
         interactive: false,
@@ -140,13 +193,15 @@
     }
 
     for (let i = 0; i < 12; i++) {
-      const tip = destPoint(lon, lat, i * 30, 240);
-      L.polyline([[lat, lon], [tip.lat, tip.lon]], {
-        color: "#f3ead6",
-        weight: 1.4,
-        opacity: 0.85,
-        interactive: false
-      }).addTo(overlay);
+      const pts = geodesic(lat, lon, i * 30, Math.PI, 180);
+      splitDateLine(pts).forEach(function (part) {
+        L.polyline(part, {
+          color: "#f3ead6",
+          weight: 1.6,
+          opacity: 0.88,
+          interactive: false
+        }).addTo(overlay);
+      });
     }
 
     document.getElementById("place-name").textContent = place ? place.name : "Custom vortex";
@@ -187,6 +242,12 @@
       moveTo(pos.coords.latitude, pos.coords.longitude, "custom", 16);
     });
   });
+  const worldBtn = document.getElementById("world-btn");
+  if (worldBtn) {
+    worldBtn.addEventListener("click", function () {
+      map.setView([vortex.lat, vortex.lon], 2);
+    });
+  }
 
   draw();
 })();
