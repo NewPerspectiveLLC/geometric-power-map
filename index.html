@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-title" content="Geometric Power" />
   <title>Matt's Geometric Power Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="css/style.css?v=2" />
+  <link rel="stylesheet" href="css/style.css?v=3" />
 </head>
 <body>
   <header id="top">
@@ -20,16 +20,21 @@
     <div id="vortex-readout">
       <strong id="place-name">Ready Athletics</strong>
       <span id="coords"></span>
+      <span id="lock-status">Unlocked</span>
     </div>
     <div id="btns">
       <button type="button" id="ra-btn" class="active">Ready Athletics</button>
       <button type="button" id="cappy-btn">Cappy's</button>
       <button type="button" id="me-btn">My location</button>
       <button type="button" id="world-btn">World</button>
+      <button type="button" id="map-btn" class="active">Street</button>
+      <button type="button" id="sat-btn">Satellite</button>
+      <button type="button" id="lock-btn">Lock vortex</button>
+      <button type="button" id="save-btn">Save</button>
     </div>
-    <p class="hint">Drag the gold pin or tap the map. The 12 lines are great circles. They meet again at the antipode. Pinch out or tap World.</p>
+    <p class="hint">Drag the gold pin or tap the map. Lock freezes the 12 wedges. Save keeps that vortex on this phone. The lines are great circles.</p>
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/map.js?v=2"></script>
+  <script src="js/map.js?v=3"></script>
 </body>
 </html>

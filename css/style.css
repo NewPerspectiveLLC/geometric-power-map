@@ -61,10 +61,14 @@ h1 {
   margin-bottom: 0.65rem;
 }
 #place-name { font-size: 1.05rem; }
-#coords {
+#coords, #lock-status {
   font-family: "Libre Franklin", Helvetica, Arial, sans-serif;
   font-size: 0.78rem;
   color: #d9d1bc;
+}
+#lock-status.locked {
+  color: #ffd24a;
+  font-weight: 700;
 }
 #btns {
   display: flex;
@@ -88,6 +92,9 @@ h1 {
   border-color: transparent;
   box-shadow: 0 2px 0 #5c241f;
 }
+#btns button:disabled {
+  opacity: 0.45;
+}
 .hint {
   font-family: "Libre Franklin", Helvetica, Arial, sans-serif;
   font-size: 0.75rem;
@@ -99,8 +106,9 @@ h1 {
   background: none !important;
   border: 0 !important;
   box-shadow: none !important;
-  color: #f3ead6;
-  font-weight: 700;
-  font-size: 13px;
-  text-shadow: 0 1px 3px #000, 0 0 6px #000;
+  color: #fff8d0;
+  font-weight: 800;
+  font-size: 14px;
+  text-shadow: 0 0 4px #000, 0 1px 2px #000, 0 0 10px #000;
 }
+body.locked #map { cursor: default; }

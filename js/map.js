@@ -1,5 +1,7 @@
 (function () {
   const KEY = "gp-map-vortex";
+  const LOCK_KEY = "gp-map-locked";
+  const BASE_KEY = "gp-map-basemap";
   const PLACES = {
     ra: {
       name: "Ready Athletics",
@@ -106,7 +108,26 @@
     localStorage.setItem(KEY, JSON.stringify(v));
   }
 
+  function loadLocked() {
+    return localStorage.getItem(LOCK_KEY) === "1";
+  }
+
+  function saveLocked(on) {
+    localStorage.setItem(LOCK_KEY, on ? "1" : "0");
+  }
+
+  function loadBase() {
+    return localStorage.getItem(BASE_KEY) === "sat" ? "sat" : "street";
+  }
+
+  function saveBase(id) {
+    localStorage.setItem(BASE_KEY, id);
+  }
+
   const start = loadVortex();
+  let locked = loadLocked();
+  let basemap = loadBase();
+
   const map = L.map("map", {
     zoomControl: true,
     attributionControl: true,
@@ -115,15 +136,33 @@
     minZoom: 2
   }).setView([start.lat, start.lon], 16);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     noWrap: false,
     attribution: "&copy; OpenStreetMap"
-  }).addTo(map);
+  });
+  const satLayer = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {
+      maxZoom: 19,
+      noWrap: false,
+      attribution: "Tiles &copy; Esri"
+    }
+  );
+
+  function applyBase() {
+    if (map.hasLayer(streetLayer)) map.removeLayer(streetLayer);
+    if (map.hasLayer(satLayer)) map.removeLayer(satLayer);
+    if (basemap === "sat") satLayer.addTo(map);
+    else streetLayer.addTo(map);
+    document.getElementById("map-btn").classList.toggle("active", basemap === "street");
+    document.getElementById("sat-btn").classList.toggle("active", basemap === "sat");
+  }
+  applyBase();
 
   const overlay = L.layerGroup().addTo(map);
   const pin = L.marker([start.lat, start.lon], {
-    draggable: true,
+    draggable: !locked,
     title: "Vortex",
     autoPan: true
   }).addTo(map);
@@ -151,19 +190,56 @@
     return best;
   }
 
+  function lineStyle() {
+    const z = map.getZoom();
+    // Zoomed out: thick black underpaint + bright gold top for contrast on sat/street
+    if (z <= 3) return { under: 10, over: 5, opacity: 1 };
+    if (z <= 5) return { under: 8, over: 4, opacity: 1 };
+    if (z <= 8) return { under: 6, over: 3, opacity: 0.98 };
+    if (z <= 12) return { under: 5, over: 2.5, opacity: 0.95 };
+    return { under: 4, over: 2, opacity: 0.92 };
+  }
+
+  function flashSave() {
+    const btn = document.getElementById("save-btn");
+    if (!btn) return;
+    const old = btn.textContent;
+    btn.textContent = "Saved";
+    btn.classList.add("active");
+    setTimeout(function () {
+      btn.textContent = old;
+      btn.classList.remove("active");
+    }, 1200);
+  }
+
+  function syncLockUI() {
+    document.body.classList.toggle("locked", locked);
+    pin.dragging[locked ? "disable" : "enable"]();
+    const status = document.getElementById("lock-status");
+    status.textContent = locked ? "Locked · wedges frozen" : "Unlocked · drag or tap to move";
+    status.classList.toggle("locked", locked);
+    const lockBtn = document.getElementById("lock-btn");
+    lockBtn.textContent = locked ? "Unlock" : "Lock vortex";
+    lockBtn.classList.toggle("active", locked);
+    ["ra-btn", "cappy-btn", "me-btn"].forEach(function (id) {
+      document.getElementById(id).disabled = locked;
+    });
+  }
+
   function draw() {
     overlay.clearLayers();
     const lat = vortex.lat;
     const lon = vortex.lon;
     const placeId = vortex.place;
     const place = PLACES[placeId];
+    const style = lineStyle();
 
     if (place && place.parcel) {
       L.polygon(place.parcel, {
-        color: "#c4a35a",
+        color: "#ffd24a",
         weight: 2,
         fillColor: "#c4a35a",
-        fillOpacity: 0.12
+        fillOpacity: 0.14
       }).addTo(overlay);
     }
 
@@ -174,10 +250,10 @@
       const edge2 = geodesic(lat, lon, b, 0.055, 12).slice().reverse();
       const local = [[lat, lon]].concat(edge1.map(function (p) { return [p.lat, p.lon]; })).concat(edge2.map(function (p) { return [p.lat, p.lon]; }));
       L.polygon(local, {
-        color: "#c4a35a",
+        color: "#ffd24a",
         weight: 0,
-        fillColor: i % 2 === 0 ? "#c4a35a" : "#8a3a32",
-        fillOpacity: 0.16,
+        fillColor: i % 2 === 0 ? "#ffd24a" : "#c45c3a",
+        fillOpacity: 0.18,
         interactive: false
       }).addTo(overlay);
       const mid = destPoint(lon, lat, a + 15, 90);
@@ -196,10 +272,20 @@
       const pts = geodesic(lat, lon, i * 30, Math.PI, 180);
       splitDateLine(pts).forEach(function (part) {
         L.polyline(part, {
-          color: "#f3ead6",
-          weight: 1.6,
-          opacity: 0.88,
-          interactive: false
+          color: "#000000",
+          weight: style.under,
+          opacity: 0.85,
+          interactive: false,
+          lineCap: "round",
+          lineJoin: "round"
+        }).addTo(overlay);
+        L.polyline(part, {
+          color: "#ffd24a",
+          weight: style.over,
+          opacity: style.opacity,
+          interactive: false,
+          lineCap: "round",
+          lineJoin: "round"
         }).addTo(overlay);
       });
     }
@@ -210,6 +296,7 @@
   }
 
   function moveTo(lat, lon, place, zoom) {
+    if (locked) return;
     vortex = { lat: lat, lon: lon, place: place || nearestPlace(lat, lon) };
     pin.setLatLng([lat, lon]);
     if (zoom) map.setView([lat, lon], zoom);
@@ -218,17 +305,21 @@
   }
 
   pin.on("drag", function (e) {
+    if (locked) return;
     const ll = e.target.getLatLng();
     vortex = { lat: ll.lat, lon: ll.lng, place: nearestPlace(ll.lat, ll.lng) };
     draw();
   });
   pin.on("dragend", function (e) {
+    if (locked) return;
     const ll = e.target.getLatLng();
     moveTo(ll.lat, ll.lng);
   });
   map.on("click", function (e) {
+    if (locked) return;
     moveTo(e.latlng.lat, e.latlng.lng);
   });
+  map.on("zoomend", draw);
 
   document.getElementById("ra-btn").addEventListener("click", function () {
     moveTo(PLACES.ra.lat, PLACES.ra.lon, "ra", 17);
@@ -237,17 +328,37 @@
     moveTo(PLACES.cappy.lat, PLACES.cappy.lon, "cappy", 17);
   });
   document.getElementById("me-btn").addEventListener("click", function () {
-    if (!navigator.geolocation) return;
+    if (locked || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(function (pos) {
       moveTo(pos.coords.latitude, pos.coords.longitude, "custom", 16);
     });
   });
-  const worldBtn = document.getElementById("world-btn");
-  if (worldBtn) {
-    worldBtn.addEventListener("click", function () {
-      map.setView([vortex.lat, vortex.lon], 2);
-    });
-  }
+  document.getElementById("world-btn").addEventListener("click", function () {
+    map.setView([vortex.lat, vortex.lon], 2);
+  });
+  document.getElementById("map-btn").addEventListener("click", function () {
+    basemap = "street";
+    saveBase(basemap);
+    applyBase();
+  });
+  document.getElementById("sat-btn").addEventListener("click", function () {
+    basemap = "sat";
+    saveBase(basemap);
+    applyBase();
+  });
+  document.getElementById("lock-btn").addEventListener("click", function () {
+    locked = !locked;
+    saveLocked(locked);
+    if (locked) saveVortex(vortex);
+    syncLockUI();
+  });
+  document.getElementById("save-btn").addEventListener("click", function () {
+    saveVortex(vortex);
+    saveLocked(locked);
+    saveBase(basemap);
+    flashSave();
+  });
 
+  syncLockUI();
   draw();
 })();
