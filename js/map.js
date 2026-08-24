@@ -244,19 +244,7 @@
     }
 
     for (let i = 0; i < 12; i++) {
-      const a = i * 30;
-      const b = (i + 1) * 30;
-      const edge1 = geodesic(lat, lon, a, 0.055, 12);
-      const edge2 = geodesic(lat, lon, b, 0.055, 12).slice().reverse();
-      const local = [[lat, lon]].concat(edge1.map(function (p) { return [p.lat, p.lon]; })).concat(edge2.map(function (p) { return [p.lat, p.lon]; }));
-      L.polygon(local, {
-        color: "#ffd24a",
-        weight: 0,
-        fillColor: i % 2 === 0 ? "#ffd24a" : "#c45c3a",
-        fillOpacity: 0.18,
-        interactive: false
-      }).addTo(overlay);
-      const mid = destPoint(lon, lat, a + 15, 90);
+      const mid = destPoint(lon, lat, i * 30 + 15, 90);
       L.marker([mid.lat, mid.lon], {
         interactive: false,
         icon: L.divIcon({
