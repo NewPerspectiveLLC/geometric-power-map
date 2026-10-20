@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-title" content="Geometric Power" />
   <title>Matt's Geometric Power Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="css/style.css?v=4" />
+  <link rel="stylesheet" href="css/style.css?v=5" />
 </head>
 <body>
   <header id="top">
@@ -16,11 +16,15 @@
     <h1>Matt's Geometric Power Map</h1>
   </header>
   <div id="map"></div>
+  <button type="button" id="hud-toggle" class="hud-toggle-float" aria-expanded="true" aria-controls="hud" title="Hide menu" hidden>Show menu</button>
   <div id="hud">
-    <div id="vortex-readout">
-      <strong id="place-name">Ready Athletics</strong>
-      <span id="coords"></span>
-      <span id="lock-status">Unlocked</span>
+    <div id="hud-bar">
+      <div id="vortex-readout">
+        <strong id="place-name">Ready Athletics</strong>
+        <span id="coords"></span>
+        <span id="lock-status">Unlocked</span>
+      </div>
+      <button type="button" id="hud-hide" title="Hide menu">Hide</button>
     </div>
     <div id="btns">
       <button type="button" id="ra-btn" class="active">Ready Athletics</button>
@@ -33,9 +37,8 @@
       <button type="button" id="save-btn">Save</button>
     </div>
     <p class="hint">Drag the gold pin or tap the map. Lock freezes the 12 wedges. Save keeps that vortex on this phone. The lines are great circles.</p>
-    <p class="hint"><a href="deepdive.html">Deep dive: wedges, capitals, influence</a></p>
   </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/map.js?v=4"></script>
+  <script src="js/map.js?v=6"></script>
 </body>
 </html>
